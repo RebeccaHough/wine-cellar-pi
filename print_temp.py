@@ -1,4 +1,6 @@
 #!/usr/bin/python
+
+### Modules ###
 import sys
 import json
 import time
@@ -7,10 +9,70 @@ import Adafruit_DHT
 import RPi.GPIO
 import requests
 
+### Variables ###
+
 # base URL of back-end server
 destURL = 'http://localhost:1337'
 # how often to poll the sensor in seconds
 pollingRate = 2
+
+#### Functions ####
+
+# GET settings data from destURL
+def getData():
+    try:
+        res = requests.get(destURL + '/get-settings-data')
+        updateSettings(res)
+        # if response contains an HTTP error, raise it
+        res.raise_for_status()
+    # catch HTTP error responses
+    except requests.exceptions.HTTPError as err:
+        handleHTTPError(err)
+    # catch connection errors
+    except requests.exceptions.ConnectionError as errc:
+        print('Error connecting')
+        # TODO
+    # catch timeout errors
+    except requests.exceptions.Timeout as errt:
+        print('Timed out')
+        # TODO retry
+    # catch-all for non-http status code errors  
+    except requests.exceptions.RequestException as e:
+        print(e)
+        # TODO
+
+# POST JSON data to URL in destURL
+def postData(data):
+    headers = {'content-type': 'application/json'}
+    try:
+        res = requests.get(destURL + '/add-data', data = data, headers = headers)
+        res.raise_for_status()
+    except requests.exceptions.HTTPError as err:
+        handleHTTPError(err)
+    except requests.exceptions.ConnectionError as errc:
+        print('Error connecting')
+        # TODO
+    except requests.exceptions.Timeout as errt:
+        print('Timed out')
+        # TODO retry
+    except requests.exceptions.RequestException as e:
+        print(e)
+        # TODO
+
+# Handle HTTP error responses
+def handleHTTPError(err):
+    # TODO print error
+    print('HTTP Error {}'.format(err))
+    # TODO write error to log file
+    # TODO handle error
+
+# Change settings such as polling rate
+def updateSettings(res):
+    # TODO
+    # pollingRate = res.data.rate
+    print(res.text)
+
+### Main ###
 
 # Enable pull-up resistor for accurate temp/humidity readings
 # TODO test, since only need a 4.7K - 10KΩ resistor between the 
@@ -24,12 +86,12 @@ while True:
 
     humidity, temperature = Adafruit_DHT.read_retry(11, 4)
 
-    print 'Temp: {0:0.1f} C  Humidity: {1:0.1f} %'.format(temperature, humidity)
+    print('Temp: {0:0.1f}\N{DEGREE SIGN}C  Humidity: {1:0.1f}%'.format(temperature, humidity))
 
     # create JSON object from Python dict
     # TODO test which time gives UNIX timestamp/best result
-    print int(time.time())
-    print datetime.datetime.now()
+    print(int(time.time()))
+    print(datetime.datetime.now())
     data = { 
         'time': int(time.time()), 
         'temperature': temperature,
@@ -44,58 +106,3 @@ while True:
 
     # send data to back-end 
     postData(json_data)
-
-#### Functions ####
-
-# TODO add which endpoints to get from/post to
-
-# GET data from destURL
-def getData():
-    try:
-        res = requests.get(destURL)
-        # if response contains an HTTP error, raise it
-        res.raise_for_status()
-    # catch HTTP error responses
-    except requests.exceptions.HTTPError as err:
-        handleHTTPError(err)
-    # catch connection errors
-    except requests.exceptions.ConnectionError as errc:
-        print 'Error connecting'
-        # TODO
-    # catch timeout errors
-    except requests.exceptions.Timeout as errt:
-        print 'Timed out'
-        # TODO retry
-    # catch-all for non-http status code errors  
-    except requests.exceptions.RequestException as e:
-        print e
-        # TODO
-
-# POST JSON data to URL in destURL
-def postData(data):
-    headers = {'content-type': 'application/json'}
-    try:
-        res = requests.get(destURL, data = data, headers = headers)
-        res.raise_for_status()
-    except requests.exceptions.HTTPError as err:
-        handleHTTPError(err)
-    except requests.exceptions.ConnectionError as errc:
-        print 'Error connecting'
-        # TODO
-    except requests.exceptions.Timeout as errt:
-        print 'Timed out'
-        # TODO retry
-    except requests.exceptions.RequestException as e:
-        print e
-        # TODO
-
-# Handle HTTP error responses
-def handleHTTPError(err):
-    # TODO print error
-    print 'HTTP Error {}'.format(err)
-    # TODO write error to log file
-    # TODO handle error
-
-# TODO Change settings such as polling rate
-def updateSettings():
-    # TODO
