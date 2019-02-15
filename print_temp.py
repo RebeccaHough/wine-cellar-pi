@@ -15,11 +15,13 @@ import requests
 destURL = 'http://localhost:1337'
 # how often to poll the sensor in seconds
 pollingRate = 2
+# json array to store measurements
+jsonDataArray
 
 #### Functions ####
 
 # GET settings data from destURL
-def getData():
+def getSettings():
     try:
         res = requests.get(destURL + '/get-settings-data')
         updateSettings(res)
@@ -68,9 +70,14 @@ def handleHTTPError(err):
 
 # Change settings such as polling rate
 def updateSettings(res):
-    # TODO
-    # pollingRate = res.data.rate
-    print(res.text)
+    # convert res to python dict
+    res = json.loads(res)
+    print(res)
+    newPollingRate = int(res['collectionFrequency'])
+    if(pollingRate != newPollingRate):
+        print('Polling rate updated to ' + newPollingRate + 'seconds')
+        pollingRate = newPollingRate
+
 
 ### Main ###
 
@@ -79,6 +86,9 @@ def updateSettings(res):
 # Data pin and the VCC pin, but internal pull-up resistor is
 # 50 KΩ - 65 KΩ according to https://elinux.org/RPi_Low-level_peripherals#Internal_Pull-Ups_.26_Pull-Downs
 GPIO.setup(12, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
+# Init json array
+jsonDataArray = json.dumps([])
 
 # TODO set sensible delay; do not poll more often than every 2 seconds (see datasheet)
 # https://stackoverflow.com/questions/474528/what-is-the-best-way-to-repeatedly-execute-a-function-every-x-seconds-in-python
@@ -89,20 +99,21 @@ while True:
     print('Temp: {0:0.1f}\N{DEGREE SIGN}C  Humidity: {1:0.1f}%'.format(temperature, humidity))
 
     # create JSON object from Python dict
-    # TODO test which time gives UNIX timestamp/best result
-    print(int(time.time()))
-    print(datetime.datetime.now())
+    now = int(time.time()))
     data = { 
-        'time': int(time.time()), 
+        'time': now, 
         'temperature': temperature,
         'humidity': humidity
     }
-    json_data = json.dumps(data)
+    jsonData = json.dumps(data)
+    # append to array
+    jsonDataArray = json.append(jsonData) 
 
-    # TODO periodically post results to server over HTTP
-    # OR post results to server all the time
-    # OR save up a lot of results then try to send to server
-    # last one could be bad if server is unavailable, may lead to backlog  
+    # every 10th minute
+    if(now % 600 == 0):
+        # check settings for update
+        getSettings()
+        # send data to back-end 
+        postData(jsonDataArray)
 
-    # send data to back-end 
-    postData(json_data)
+    sleep(pollingRate)
