@@ -6,30 +6,33 @@ import json
 import time
 import datetime
 import Adafruit_DHT
-import RPi.GPIO
+import RPi.GPIO as GPIO
 import requests
 
 ### Variables ###
 
-# base URL of back-end server
-destURL = 'http://localhost:1337'
-# how often to poll the sensor in seconds
-pollingRate = 2
+# Base URL of back-end server
+# 134.255.216.69
+# 72.24.67.209:
+# ATLANTA
+dest_URL = 'http://atlanta:1337'
+# How often to poll the sensor in seconds
+polling_rate = 2
 # json array to store measurements
-jsonDataArray
+json_data_array
 
 #### Functions ####
 
 # GET settings data from destURL
-def getSettings():
+def get_settings():
     try:
-        res = requests.get(destURL + '/get-settings-data')
-        updateSettings(res)
+        res = requests.get(dest_URL + '/get-settings-data')
         # if response contains an HTTP error, raise it
         res.raise_for_status()
+        update_settings(res)
     # catch HTTP error responses
     except requests.exceptions.HTTPError as err:
-        handleHTTPError(err)
+        handle_HTTP_error(err)
     # catch connection errors
     except requests.exceptions.ConnectionError as errc:
         print('Error connecting')
@@ -44,13 +47,13 @@ def getSettings():
         # TODO
 
 # POST JSON data to URL in destURL
-def postData(data):
+def post_data(data):
     headers = {'content-type': 'application/json'}
     try:
-        res = requests.get(destURL + '/add-data', data = data, headers = headers)
+        res = requests.get(dest_URL + '/add-data', data = data, headers = headers)
         res.raise_for_status()
     except requests.exceptions.HTTPError as err:
-        handleHTTPError(err)
+        handle_HTTP_error(err)
     except requests.exceptions.ConnectionError as errc:
         print('Error connecting')
         # TODO
@@ -62,58 +65,78 @@ def postData(data):
         # TODO
 
 # Handle HTTP error responses
-def handleHTTPError(err):
+def handle_HTTP_error(err):
     # TODO print error
     print('HTTP Error {}'.format(err))
     # TODO write error to log file
     # TODO handle error
 
 # Change settings such as polling rate
-def updateSettings(res):
+def update_settings(res):
     # convert res to python dict
     res = json.loads(res)
     print(res)
-    newPollingRate = int(res['collectionFrequency'])
-    if(pollingRate != newPollingRate):
-        print('Polling rate updated to ' + newPollingRate + 'seconds')
-        pollingRate = newPollingRate
+    new_polling_rate = int(res['collectionFrequency'])
+    if(polling_rate != new_polling_rate):
+        print('Polling rate updated to ' + new_polling_rate + 'seconds')
+        polling_rate = new_polling_rate
 
+# Append the JSON object in the second argument to the JSON array in the first argument
+def append_to_json_array(arr, to_append):
+    # convert to python
+    arr_as_dict = json.loads(arr)
+    to_append_as_obj = json.loads(to_append)
+    # append to list
+    arr_as_dict.append(to_append_as_obj)
+    # return JSON
+    return json.dumps(arr_as_dict)
 
 ### Main ###
 
+# Set pin numbering mode to GPIO numbering (e.g. GPIO4 = pin 7) 
+GPIO.setmode(GPIO.BCM)  
+
 # Enable pull-up resistor for accurate temp/humidity readings
-# TODO test, since only need a 4.7K - 10KΩ resistor between the 
+# TODO test, since only need a 4.7K - 10KOhm resistor between the 
 # Data pin and the VCC pin, but internal pull-up resistor is
-# 50 KΩ - 65 KΩ according to https://elinux.org/RPi_Low-level_peripherals#Internal_Pull-Ups_.26_Pull-Downs
-GPIO.setup(12, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+# 50 KOhm - 65 KOhm according to https://elinux.org/RPi_Low-level_peripherals#Internal_Pull-Ups_.26_Pull-Downs
+GPIO.setup(4, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
-# Init json array
-jsonDataArray = json.dumps([])
+# Initialise
+json_data_array = json.dumps([])
 
-# TODO set sensible delay; do not poll more often than every 2 seconds (see datasheet)
-# https://stackoverflow.com/questions/474528/what-is-the-best-way-to-repeatedly-execute-a-function-every-x-seconds-in-python
 while True:
+    # Try to get a sensor reading. The read_retry method which will retry up to 15 times
+    # (by default) to get a sensor reading (waiting 2 seconds between each retry)
+    humidity, temperature = Adafruit_DHT.read_retry(Adafruit_DHT.DHT22, 4)
 
-    humidity, temperature = Adafruit_DHT.read_retry(11, 4)
+    if humidity is not None and temperature is not None:
+        # Log humidity and temperature along with human-readable time
+        print('Time: {0} Temp: {1:0.1f}\N{DEGREE SIGN}C  Humidity: {2:0.1f}%'.format(datetime.datetime.now(), temperature, humidity))
 
-    print('Temp: {0:0.1f}\N{DEGREE SIGN}C  Humidity: {1:0.1f}%'.format(temperature, humidity))
+        # Get current time as UNIX timestamp
+        current_time = int(time.time()),
 
-    # create JSON object from Python dict
-    now = int(time.time()))
-    data = { 
-        'time': now, 
-        'temperature': temperature,
-        'humidity': humidity
-    }
-    jsonData = json.dumps(data)
-    # append to array
-    jsonDataArray = json.append(jsonData) 
+        # Create JSON object from Python dictionary
+        data = { 
+            'time': current_time, 
+            'temperature': temperature,
+            'humidity': humidity
+        }
+        json_data = json.dumps(data)
 
-    # every 10th minute
-    if(now % 600 == 0):
-        # check settings for update
-        getSettings()
-        # send data to back-end 
-        postData(jsonDataArray)
+        # append to array of all measurements
+        json_data_array = append_to_json_array(json_data_array, json_data)
 
-    sleep(pollingRate)
+        # every 10th minute
+        if(current_time % 600 == 0):
+            # check settings for update
+            get_settings()
+            # send data to back-end 
+            postData(json_data_array)
+        
+        # Wait t seconds between reads (if they are consecutively succesful; else
+        # the wait will be up to 30s longer)
+        time.sleep(polling_rate)
+    else:
+        print('Sensor read failed. Please check sensor connection.')
