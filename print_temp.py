@@ -29,11 +29,11 @@ json_data_array = json.dumps([])
 def get_settings():
     try:
         res = requests.get(dest_URL + '/get-settings-data')
-        # if response contains an HTTP error, raise it and enter appropriate catch block
-        res.raise_for_status()
         # convert res to python dict
         res = json.loads(res)
         print('Server responded with {}'.format(res))
+        # if response contains an HTTP error, raise it and enter appropriate catch block
+        res.raise_for_status()
         # attempt to update settings
         if(update_settings(res)):
             # return true if settings update succeeds
