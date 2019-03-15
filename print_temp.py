@@ -62,7 +62,7 @@ def get_settings():
 def post_data(data):
     headers = {'content-type': 'application/json'}
     try:
-        res = requests.post(dest_URL + '/add-data', data = data, headers = headers)
+        res = requests.post(dest_URL + '/database', data = data, headers = headers)
         res.raise_for_status()
         return True
     except requests.exceptions.HTTPError as err:
