@@ -28,7 +28,7 @@ json_data_array = json.dumps([])
 # GET settings data from dest_URL
 def get_settings():
     try:
-        res = requests.get(dest_URL + '/get-settings-data')
+        res = requests.get(dest_URL + '/data-collection-settings')
         # convert res to python dict
         res = json.loads(res)
         print('Server responded with {}'.format(res))
@@ -53,7 +53,7 @@ def get_settings():
     # catch-all for non-http status code errors  
     except requests.exceptions.RequestException as e:
         print('Request exception {}'.format(e)
-    except ValueError as e:
+    except ValueError:
         print('JSON parse failed. Could not check or update settings.')
     # return false if any errors occur
     return False
@@ -62,7 +62,7 @@ def get_settings():
 def post_data(data):
     headers = {'content-type': 'application/json'}
     try:
-        res = requests.get(dest_URL + '/add-data', data = data, headers = headers)
+        res = requests.post(dest_URL + '/add-data', data = data, headers = headers)
         res.raise_for_status()
         return True
     except requests.exceptions.HTTPError as err:
