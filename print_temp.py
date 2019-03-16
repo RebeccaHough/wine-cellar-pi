@@ -33,7 +33,7 @@ save_file = 'save_temp.json'
 # GET settings data from dest_URL
 def get_settings():
     try:
-        res = requests.get(dest_URL + '/get-settings-data')
+        res = requests.get(dest_URL + '/data-collection-settings')
         # convert res to python dict
         res = json.loads(res)
         print('Server responded with {}'.format(res))
@@ -67,7 +67,7 @@ def get_settings():
 def post_data(data):
     headers = {'content-type': 'application/json'}
     try:
-        res = requests.get(dest_URL + '/add-data', data = data, headers = headers)
+        res = requests.post(dest_URL + '/database', data = data, headers = headers)
         res = json.loads(res)
         print('Server responded with {}'.format(res))
         res.raise_for_status()
