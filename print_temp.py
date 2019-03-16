@@ -5,6 +5,7 @@ import sys
 import json
 import time
 import datetime
+import os
 import Adafruit_DHT
 import RPi.GPIO as GPIO
 import requests
@@ -14,16 +15,20 @@ import requests
 # Base URL of back-end server
 dest_URL = 'https://62195c9b.ngrok.io'
 # Default settings
-# sensorPollingRate is in seconds
+# sensorPollingRate and sendFrequency are in seconds
+# sendFrequency describes how often the Pi should attempt to post its data to the back-end
 settings = {
     "collectTemperature": True,
     "collectHumidity": True,
-    "sensorpollingRate": 2
+    "sensorpollingRate": 60, # every minute
+    "sendFrequency": 1200 # every 20 minutes
 }
 # JSON array of objects to store measurements
 json_data_array = json.dumps([])
+# Path to save file
+save_file = 'save_temp.json'
 
-#### Functions ####
+### Functions ###
 
 # GET settings data from dest_URL
 def get_settings():
@@ -53,7 +58,7 @@ def get_settings():
     # catch-all for non-http status code errors  
     except requests.exceptions.RequestException as e:
         print('Request exception {}'.format(e)
-    except ValueError as e:
+    except ValueError:
         print('JSON parse failed. Could not check or update settings.')
     # return false if any errors occur
     return False
@@ -63,6 +68,8 @@ def post_data(data):
     headers = {'content-type': 'application/json'}
     try:
         res = requests.get(dest_URL + '/add-data', data = data, headers = headers)
+        res = json.loads(res)
+        print('Server responded with {}'.format(res))
         res.raise_for_status()
         return True
     except requests.exceptions.HTTPError as err:
@@ -73,6 +80,8 @@ def post_data(data):
         print('Timed out {}'.format(errt))
     except requests.exceptions.RequestException as e:
         print('Request exception {}'.format(e)
+    except ValueError:
+        print('JSON parse failed. Could not check or update settings.')
     return False
 
 # Update settings using server response (as a python dict)
@@ -83,16 +92,14 @@ def update_settings(res):
         if(data != settings):
             data = settings
             print('Succesfully updated settings.')
-            return True
         else:
             print('Settings unchanged.')
-            return True
+        return True
     except ValueError as e:
         print('Failed to update settings. {}'.format(e))
-        return False
     except Exception as e:
         print('Failed to update settings. {}'.format(e))
-        return False
+    return False
 
 # Append the JSON object in the second argument to the JSON array in the first argument
 def append_to_json_array(arr, to_append):
@@ -103,6 +110,37 @@ def append_to_json_array(arr, to_append):
     arr_as_dict.append(to_append_as_obj)
     # return JSON
     return json.dumps(arr_as_dict)
+
+# Read file
+def read_file(filepath):
+    try:
+        # open in read mode
+        with open(filepath, 'r') as f:
+            data = f.read()
+            data = json.dumps(data)
+        return data
+    except FileNotFoundError as f:
+        print('Could not read save file. {}'.format(f))
+    except ValueError:
+        print('JSON parse failed on read file attempt.')
+    return None
+
+# Save data to file, overwriting what is there
+def write_to_file(filepath, data):
+    try:
+        # open in write mode
+        with open(filepath, 'w') as f:
+            f.write(data)
+    except FileNotFoundError as f:
+        print('Could not write save data to file. {}'.format(f))
+
+# Delete file
+def delete_file(filepath):
+    try:
+        os.remove(filepath) 
+        print('Deleted temporary save file.')
+    except FileNotFoundError:
+        # continue
 
 ### Main ###
 
@@ -135,8 +173,8 @@ while True:
         # append to array of all measurements
         json_data_array = append_to_json_array(json_data_array, json_data)
 
-        # every 10th minute
-        if(current_time % 600 == 0):
+        # every nth second
+        if(current_time % settings.sendFrequency == 0):
             # check settings for update
             get_settings()
             # send data to back-end 
@@ -144,8 +182,18 @@ while True:
                 print('Data successfully sent to back-end.')
                 # clear data array
                 json_data_array = json.dumps([])
+                # delete ('clear') save file if it exists
+                delete_file(save_file);
             else: 
                 print('Failed to send data to back-end. Next retry will be in 10 minutes.')
+                print('Saving data to file.')
+                # read save file
+                data = read_file(save_file)
+                # if save has content
+                if(data != None)
+                    # append to it
+                    data = append_to_json_array(data, json_data_array)
+                write_to_file(save_file, data)
         
         # Wait t seconds between reads (if the reads are consecutively succesful; else
         # the wait will be up to 30s longer)
