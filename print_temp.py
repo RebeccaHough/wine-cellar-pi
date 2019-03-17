@@ -143,7 +143,7 @@ def delete_file(filepath):
         # continue
 
 # Schedule periodic atttempts to send data to the back-end. If the send fails, save the data to file
-def send_or_save_data(json_data_array):
+def send_or_save_data():
     # check settings for update
     get_settings()
     # send data to back-end 
