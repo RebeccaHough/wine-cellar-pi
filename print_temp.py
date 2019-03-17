@@ -117,7 +117,7 @@ def append_to_json_array(arr, to_append):
     # print(to_append_as_python)
     # print(type(to_append_as_python))
     # Append to list
-    if(to_append_as_python is list):
+    if(type(to_append_as_python) is list):
         # Add all elements in second list to first list (i.e. don't add the entire list as
         # an element of the first list
         arr_as_list.extend(to_append_as_python)
