@@ -142,6 +142,31 @@ def delete_file(filepath):
     except FileNotFoundError:
         # continue
 
+# Schedule periodic atttempts to send data to the back-end. If the send fails, save the data to file
+def send_or_save_data(json_data_array):
+    # check settings for update
+    get_settings()
+    # send data to back-end 
+    if(post_data(json_data_array)):
+        print('Data successfully sent to back-end.')
+        # clear data array
+        json_data_array = json.dumps([])
+        # delete ('clear') save file if it exists
+        delete_file(save_file);
+    else: 
+        print('Failed to send data to back-end. Next retry will be in 10 minutes.')
+        print('Saving data to file.')
+        # read save file
+        data = read_file(save_file)
+        # if save has content
+        if(data != None)
+            # append to it
+            data = append_to_json_array(data, json_data_array)
+        write_to_file(save_file, data)
+    # schedule next send
+    threading.Timer(settings.sendFrequency, send_or_save_data).start()
+
+
 ### Main ###
 
 # Set pin numbering mode to GPIO numbering (e.g. GPIO4 = pin 7) 
@@ -149,6 +174,9 @@ GPIO.setmode(GPIO.BCM)
 
 # Enable pull-up resistor for accurate temp/humidity readings
 GPIO.setup(4, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
+# set flag
+first = True
 
 while True:
     # Try to get a sensor reading. The read_retry method which will retry up to 15 times
@@ -173,27 +201,12 @@ while True:
         # append to array of all measurements
         json_data_array = append_to_json_array(json_data_array, json_data)
 
-        # every nth second
-        if(current_time % settings.sendFrequency == 0):
-            # check settings for update
-            get_settings()
-            # send data to back-end 
-            if(post_data(json_data_array)):
-                print('Data successfully sent to back-end.')
-                # clear data array
-                json_data_array = json.dumps([])
-                # delete ('clear') save file if it exists
-                delete_file(save_file);
-            else: 
-                print('Failed to send data to back-end. Next retry will be in 10 minutes.')
-                print('Saving data to file.')
-                # read save file
-                data = read_file(save_file)
-                # if save has content
-                if(data != None)
-                    # append to it
-                    data = append_to_json_array(data, json_data_array)
-                write_to_file(save_file, data)
+
+        # if first run through while loop, set flag and start data-sending function
+        if(first):
+            first = False
+            # roughly every settings.sendFrequency seconds, attempt to send data to back-end
+            send_or_save_data()
         
         # Wait t seconds between reads (if the reads are consecutively succesful; else
         # the wait will be up to 30s longer)
