@@ -15,14 +15,14 @@ import math
 ### Variables ###
 
 # Base URL of back-end server
-dest_URL = 'https://f985edd6.ngrok.io'
+dest_URL = 'https://6f0dfe1d.ngrok.io'
 # Default settings
 # sensorPollingRate and sendFrequency are in seconds
 # sendFrequency describes how often the Pi should attempt to post its data to the back-end
 settings = {
     "collectTemperature": True,
     "collectHumidity": True,
-    "sensorPollingRate": 60, # every minute
+    "sensorPollingRate": 120, # every 2 minutes
     "sendFrequency": 1200 # every 20 minutes
 }
 # JSON array of objects to store measurements
@@ -192,6 +192,11 @@ def send_or_save_data():
     # Schedule next send
     threading.Timer(settings['sendFrequency'], send_or_save_data).start()
 
+# Truncate decimals
+def truncate(n, decimals=0):
+    multiplier = 10 ** decimals
+    return int(n * multiplier) / multiplier
+
 
 ### Main ###
 
@@ -208,6 +213,10 @@ while True:
     # Try to get a sensor reading. The read_retry method which will retry up to 15 times
     # (by default) to get a sensor reading (waiting 2 seconds between each retry)
     humidity, temperature = Adafruit_DHT.read_retry(Adafruit_DHT.DHT22, 4)
+    
+    # Truncate to 2 d.p.
+    humidity = truncate(humidity, 2)
+    temperature = truncate(temperature, 2)
 
     if humidity is not None and temperature is not None:
         # Log humidity and temperature along with human-readable time
