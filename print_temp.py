@@ -15,7 +15,7 @@ import math
 ### Variables ###
 
 # Base URL of back-end server
-dest_URL = 'https://62195c9b.ngrok.io'
+dest_URL = 'https://f985edd6.ngrok.io'
 # Default settings
 # sensorPollingRate and sendFrequency are in seconds
 # sendFrequency describes how often the Pi should attempt to post its data to the back-end
@@ -90,7 +90,7 @@ def post_data(data):
 def update_settings(res):
     global settings
     try:
-        data = res.data
+        data = res['data']
         # Update settings if they dont match
         if(data != settings):
             settings = data
@@ -134,7 +134,7 @@ def read_file(filepath):
             data = f.read()
         return data
     except FileNotFoundError as f:
-        print('Could not read save file. {}'.format(f))
+        print('No previous save file exists. {}'.format(f))
     except ValueError:
         print('JSON parse failed on read file attempt.')
     return None
@@ -143,10 +143,13 @@ def read_file(filepath):
 def write_to_file(filepath, data):
     try:
         # Open in write mode
+        print('Writing to new or opened file {}.'.format(filepath))
         with open(filepath, 'w') as f:
             f.write(data)
+        return True
     except FileNotFoundError as f:
         print('Could not write save data to file. {}'.format(f))
+        return False
 
 # Delete file
 def delete_file(filepath):
@@ -163,6 +166,14 @@ def send_or_save_data():
     
     # Check settings for update
     get_settings()
+    
+    # Get data from existing save file if it exists
+    data = read_file(save_file)
+    # If save has content
+    if(data != ''):
+        # Append to it
+        json_data_array = append_to_json_array(data, json_data_array)
+        
     # Send data to back-end 
     if(post_data(json_data_array)):
         print('Data successfully sent to back-end.')
@@ -173,17 +184,11 @@ def send_or_save_data():
     else: 
         print('Failed to send data to back-end. Next retry will be in {} minutes.'.format((settings['sendFrequency'] / 60)))
         print('Saving data to file.')
-        # Read save file
-        data = read_file(save_file)
-        # If save has content
-        if(data != ''):
-            # Append to it
-            new_data = append_to_json_array(data, json_data_array)
-            write_to_file(save_file, new_data)
-        else:
-            write_to_file(save_file, json_data_array)
-        # Clear data array
-        json_data_array = json.dumps([])
+        # Attempt to save to file
+        if(write_to_file(save_file, json_data_array)):
+            # If save successful, clear data array
+            json_data_array = json.dumps([])
+    
     # Schedule next send
     threading.Timer(settings['sendFrequency'], send_or_save_data).start()
 
