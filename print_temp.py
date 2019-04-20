@@ -36,11 +36,11 @@ save_file = 'save_temp.json'
 def get_settings():
     try:
         res = requests.get(dest_URL + '/data-collection-settings')
+        # If response contains an HTTP error, raise it and enter appropriate catch block
+        res.raise_for_status()
         # Convert res to python dict
         body = res.json()
         print('Server responded with {}'.format(body))
-        # If response contains an HTTP error, raise it and enter appropriate catch block
-        res.raise_for_status()
         # Attempt to update settings
         if(update_settings(body)):
             # Return true if settings update succeeds
@@ -70,9 +70,9 @@ def post_data(data):
     headers = {'content-type': 'application/json'}
     try:
         res = requests.post(dest_URL + '/database', data = data, headers = headers)
+        res.raise_for_status()
         body = res.json()
         print('Server responded with {}'.format(body))
-        res.raise_for_status()
         return True
     except requests.exceptions.HTTPError as err:
         print('HTTP Error {}'.format(err))
